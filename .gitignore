@@ -1,0 +1,34 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+*.egg-info/
+.pytest_cache/
+
+# --- Secrets & Keys ---
+config_local.py
+.env
+*.key
+*.pem
+honeypot/host_key
+honeypot/host_key.pub
+
+# --- Honeypot Data (real attacker IPs/commands shouldn't be public) ---
+data/logs/
+reports/
+*.log
+
+# --- IDE ---
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# --- OS ---
+.DS_Store
+Thumbs.db
