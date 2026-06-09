@@ -1,0 +1,138 @@
+{
+  "patterns": [
+    {
+      "id": "T1078",
+      "name": "Valid Accounts",
+      "tactic": "Initial Access",
+      "matches": ["login_attempt"],
+      "description": "Adversaries attempt to gain access using valid credentials."
+    },
+    {
+      "id": "T1110",
+      "name": "Brute Force",
+      "tactic": "Credential Access",
+      "matches": ["multiple_login_failures"],
+      "description": "Adversaries use brute force techniques to gain access."
+    },
+    {
+      "id": "T1059.004",
+      "name": "Command and Scripting Interpreter: Unix Shell",
+      "tactic": "Execution",
+      "matches": ["bash", "sh", "zsh"],
+      "regex": ["^(bash|sh|zsh)(\\s|$)"],
+      "description": "Adversaries abuse Unix shell commands for execution."
+    },
+    {
+      "id": "T1059.006",
+      "name": "Command and Scripting Interpreter: Python",
+      "tactic": "Execution",
+      "matches": ["python", "python3"],
+      "regex": ["^python[23]?(\\s|$)"],
+      "description": "Adversaries abuse Python for execution."
+    },
+    {
+      "id": "T1082",
+      "name": "System Information Discovery",
+      "tactic": "Discovery",
+      "matches": ["uname", "hostname", "lsb_release"],
+      "regex": ["^(uname|hostname|lsb_release|cat\\s+/etc/os-release|cat\\s+/proc/version)"],
+      "description": "Adversaries gather system information for follow-on activity."
+    },
+    {
+      "id": "T1083",
+      "name": "File and Directory Discovery",
+      "tactic": "Discovery",
+      "matches": ["ls", "dir", "find", "locate"],
+      "regex": ["^(ls|dir|find|locate)(\\s|$)"],
+      "description": "Adversaries enumerate files and directories."
+    },
+    {
+      "id": "T1087.001",
+      "name": "Account Discovery: Local Account",
+      "tactic": "Discovery",
+      "matches": ["cat /etc/passwd", "cat /etc/shadow", "getent passwd"],
+      "regex": ["cat\\s+/etc/(passwd|shadow|group)", "^getent\\s+passwd"],
+      "description": "Adversaries enumerate local user accounts."
+    },
+    {
+      "id": "T1016",
+      "name": "System Network Configuration Discovery",
+      "tactic": "Discovery",
+      "matches": ["ifconfig", "ip addr", "ip a", "netstat", "route"],
+      "regex": ["^(ifconfig|ip\\s+a|ip\\s+addr|netstat|route)"],
+      "description": "Adversaries gather network configuration details."
+    },
+    {
+      "id": "T1033",
+      "name": "System Owner/User Discovery",
+      "tactic": "Discovery",
+      "matches": ["whoami", "id", "who", "w"],
+      "regex": ["^(whoami|id|who|w)(\\s|$)"],
+      "description": "Adversaries identify the primary user of a system."
+    },
+    {
+      "id": "T1105",
+      "name": "Ingress Tool Transfer",
+      "tactic": "Command and Control",
+      "matches": ["wget", "curl", "scp", "tftp"],
+      "regex": ["^(wget|curl|scp|tftp)(\\s|$)"],
+      "description": "Adversaries transfer tools/files into the environment from external systems."
+    },
+    {
+      "id": "T1222.002",
+      "name": "Linux File and Directory Permissions Modification",
+      "tactic": "Defense Evasion",
+      "matches": ["chmod", "chown", "chattr"],
+      "regex": ["^(chmod|chown|chattr)(\\s|$)"],
+      "description": "Adversaries modify file/directory permissions to bypass restrictions."
+    },
+    {
+      "id": "T1053.003",
+      "name": "Scheduled Task/Job: Cron",
+      "tactic": "Persistence",
+      "matches": ["crontab", "/etc/cron"],
+      "regex": ["crontab|/etc/cron"],
+      "description": "Adversaries use cron for persistence and scheduled execution."
+    },
+    {
+      "id": "T1098.004",
+      "name": "Account Manipulation: SSH Authorized Keys",
+      "tactic": "Persistence",
+      "matches": ["authorized_keys", ".ssh/authorized_keys"],
+      "regex": ["authorized_keys"],
+      "description": "Adversaries add SSH keys to maintain persistent access."
+    },
+    {
+      "id": "T1136.001",
+      "name": "Create Account: Local Account",
+      "tactic": "Persistence",
+      "matches": ["useradd", "adduser"],
+      "regex": ["^(useradd|adduser)(\\s|$)"],
+      "description": "Adversaries create local accounts to maintain access."
+    },
+    {
+      "id": "T1070.003",
+      "name": "Indicator Removal: Clear Command History",
+      "tactic": "Defense Evasion",
+      "matches": ["history -c", ".bash_history"],
+      "regex": ["history\\s+-c|>\\s*~?/?\\.bash_history|rm\\s+.*bash_history"],
+      "description": "Adversaries clear command history to evade detection."
+    },
+    {
+      "id": "T1496",
+      "name": "Resource Hijacking",
+      "tactic": "Impact",
+      "matches": ["xmrig", "minerd", "cgminer"],
+      "regex": ["xmrig|minerd|cgminer|stratum\\+tcp"],
+      "description": "Adversaries hijack system resources (often for cryptomining)."
+    },
+    {
+      "id": "T1021.004",
+      "name": "Remote Services: SSH",
+      "tactic": "Lateral Movement",
+      "matches": ["ssh"],
+      "regex": ["^ssh\\s+"],
+      "description": "Adversaries use SSH to move laterally."
+    }
+  ]
+}
