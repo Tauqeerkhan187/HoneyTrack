@@ -18,7 +18,7 @@ def generate_session_report(session: dict, enrich: bool = False) -> dict:
     enrichment = None
 
     if enrich and session.get("peer_ip"):
-        enrichment = IOCEnricher(),enrich_ip(session["peer_ip"])
+        enrichment = IOCEnricher().enrich_ip(session["peer_ip"])
 
     report = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
