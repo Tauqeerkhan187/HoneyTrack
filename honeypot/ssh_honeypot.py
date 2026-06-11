@@ -1,22 +1,28 @@
 # Author: TK
 # Date: 08-06-2026
-# Purpose: listens for connections and accepts credentials
+# Purpose: listens for connections and accepts credentials.
 
 import asyncio
-import asyncssh
 import os
-from datetime import datetime
-from honeypot.session_handler import SessionHandler
+
+import asyncssh
+
 from config import (
-    HONEYPOT_HOST, HONEYPOT_PORT, HONEYPOT_BANNER,
-    FAKE_HOSTNAME, FAKE_USER, FAKE_AUTH_DELAY
+    HONEYPOT_HOST,
+    HONEYPOT_PORT,
+    HONEYPOT_BANNER,
+    FAKE_HOSTNAME,
+    FAKE_USER,
+    FAKE_AUTH_DELAY,
 )
 
-# Generate a host key if one doesn't exist.
+from honeypot.session_handler import SessionHandler, log_auth_attempt
+
+
 HOST_KEY_PATH = os.path.join(os.path.dirname(__file__), "host_key")
 
 
-def ensure_host_key():
+def ensure_host_key() -> None:
     if not os.path.exists(HOST_KEY_PATH):
         print("[*] Generating SSH host key...")
         key = asyncssh.generate_private_key("ssh-rsa")
@@ -25,62 +31,76 @@ def ensure_host_key():
 
 
 class HoneypotSSHServer(asyncssh.SSHServer):
-    """Accepts all authentication attempts."""
+    """Accepts password authentication and logs every credential attempt."""
 
     def __init__(self):
-        self._peer_addr = None
+        self._conn = None
+        self._peer_addr = ("unknown", 0)
 
     def connection_made(self, conn):
-        self._peer_addr = conn.get_extra_info("peername")
-        print(f"[+] Connection from {self._peer_addr[0]}:{self._peer_addr[1]}")
-
-    def connection_lost(self, exc):
-        pass
+        self._conn = conn
+        self._peer_addr = conn.get_extra_info("peername") or ("unknown", 0)
+        print(f"[+] SSH connection from {self._peer_addr[0]}:{self._peer_addr[1]}")
 
     def begin_auth(self, username):
-        # Accept all usrnames, move to passwrd check
         return True
 
-    def passwrd_auth_supported(self):
+    def password_auth_supported(self):
         return True
 
-    async def validate_passwrd(self, username, password):
-        # Log the credential attempt
+    async def validate_password(self, username, password):
+        log_auth_attempt(self._peer_addr, username, password, accepted=True)
         print(f"[CRED] {self._peer_addr[0]} tried {username}:{password}")
-        await asyncio.sleep(FAKE_AUTH_DELAY) # simulate real auth delay
-        return True # accept everything
+        await asyncio.sleep(FAKE_AUTH_DELAY)
+        return True
+
+    def session_requested(self):
+        return HoneypotSSHServerSession(self._peer_addr)
+
 
 class HoneypotSSHServerSession(asyncssh.SSHServerSession):
-    """Handles an interactive shell session."""
+    """Handles an interactive fake shell."""
 
     def __init__(self, peer_addr):
         self._handler = SessionHandler(peer_addr)
         self._input_buf = ""
+        self._chan = None
+
+    def connection_made(self, chan):
+        self._chan = chan
+
+    def pty_requested(self, term_type, term_size, term_modes):
+        return True
 
     def shell_requested(self):
         return True
 
     def session_started(self):
+        self._chan.write("Welcome to Ubuntu 22.04.3 LTS\r\n")
         self._send_prompt()
 
     def data_received(self, data, datatype):
-        self.input_buf += data
-        # process line by line
+        if isinstance(data, bytes):
+            data = data.decode("utf-8", errors="ignore")
+
+        self._input_buf += data
+
         while "\n" in self._input_buf:
             line, self._input_buf = self._input_buf.split("\n", 1)
             line = line.replace("\r", "").strip()
+
             response = self._handler.handle_command(line)
+
             if response == "__EXIT__":
                 self._chan.write("logout\r\n")
-                self._chan.exit(0)
                 self._handler.close()
+                self._chan.exit(0)
                 return
+
             if response:
                 self._chan.write(response + "\r\n")
-            self._send_prompt()
 
-    def _send_prompt(self):
-        self._chan.write(f"{FAKE_USER}@{FAKE_HOSTNAME}:{self._handler.cwd}# ")
+            self._send_prompt()
 
     def eof_received(self):
         self._handler.close()
@@ -89,37 +109,22 @@ class HoneypotSSHServerSession(asyncssh.SSHServerSession):
     def connection_lost(self, exc):
         self._handler.close()
 
+    def _send_prompt(self):
+        self._chan.write(f"{FAKE_USER}@{FAKE_HOSTNAME}:{self._handler.cwd}# ")
+
+
 async def start_honeypot():
     ensure_host_key()
 
-    def server_factory():
-        return HoneypotSSHServer()
-
-    def session_factory(peer_addr):
-        return lambda: HoneypotSSHServerSession(peer_addr)
-
-    # Patch: pass peer_addr into session
-    class PeerAwareServer(HoneypotSSHServer):
-        def __init__(self):
-            super().__init__()
-
-        def connection_made(self, conn):
-            super().connection_made(conn)
-            self._conn = conn
-
-        def session_requested(self, channel, request, *args, **kwargs):
-            peer = self._conn.get_extra_info("peername")
-            return HoneypotSSHServerSession(peer)
-
     await asyncssh.create_server(
-        PeerAwareServer,
+        HoneypotSSHServer,
         HONEYPOT_HOST,
         HONEYPOT_PORT,
         server_host_keys=[HOST_KEY_PATH],
-        process_factory=None,
-        allow_pty=True,
+        server_version=HONEYPOT_BANNER,
+        encoding="utf-8",
     )
-    print(f"[*] HoneyTrack SSH honeypot listening on {HONEYPOT_HOST}: {HONEYPOT_PORT}")
-    await asyncio.Future() # Runs forever
 
+    print(f"[*] HoneyTrack SSH honeypot listening on {HONEYPOT_HOST}:{HONEYPOT_PORT}")
 
+    await asyncio.Future()

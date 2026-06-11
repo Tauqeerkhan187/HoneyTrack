@@ -26,7 +26,7 @@ except ImportError:
     VIRUSTOTAL_API_KEY = ""
 
 # Dashboard
-DASHBOARD_HOST = "0,0,0,0"
+DASHBOARD_HOST = "0.0.0.0"
 DASHBOARD_PORT = 5000
 DEBUG = True
 
