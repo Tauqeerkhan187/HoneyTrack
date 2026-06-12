@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HoneyTrack — SOC Dashboard</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="dot"></span>
+      <h1>HoneyTrack</h1>
+      <span class="subtitle">SSH Honeypot · Attacker Profiling · MITRE ATT&amp;CK</span>
+    </div>
+    <div class="controls">
+      <label class="toggle">
+        <input type="checkbox" id="enrichToggle" />
+        <span>IOC enrichment</span>
+      </label>
+      <span id="status" class="status">connecting…</span>
+      <button id="refreshBtn" class="btn">Refresh</button>
+    </div>
+  </header>
+
+  <section class="stat-grid">
+    <div class="stat-card">
+      <div class="stat-label">Total Sessions</div>
+      <div class="stat-value" id="statSessions">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Unique Attackers</div>
+      <div class="stat-value" id="statAttackers">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Commands Captured</div>
+      <div class="stat-value" id="statCommands">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Distinct TTPs</div>
+      <div class="stat-value" id="statTtps">—</div>
+    </div>
+  </section>
+
+  <section class="chart-row">
+    <div class="panel">
+      <div class="panel-head">MITRE ATT&amp;CK Tactics</div>
+      <div class="panel-body"><canvas id="tacticsChart"></canvas></div>
+    </div>
+    <div class="panel">
+      <div class="panel-head">Top Techniques</div>
+      <div class="panel-body"><canvas id="ttpChart"></canvas></div>
+    </div>
+  </section>
+
+  <section class="table-row">
+    <div class="panel">
+      <div class="panel-head">Top Attackers</div>
+      <div class="panel-body">
+        <table class="data-table">
+          <thead>
+            <tr><th>Source IP</th><th>Sessions</th><th>Risk</th><th>Country</th><th>ISP</th></tr>
+          </thead>
+          <tbody id="attackerTable">
+            <tr><td colspan="5" class="empty">No data yet — run some attacks from Kali.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="table-row">
+    <div class="panel">
+      <div class="panel-head">Most-Run Commands</div>
+      <div class="panel-body">
+        <table class="data-table">
+          <thead><tr><th>Command</th><th>Count</th></tr></thead>
+          <tbody id="commandTable">
+            <tr><td colspan="2" class="empty">No data yet.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <footer class="footer">
+    HoneyTrack · auto-refresh every 15s ·
+    <span id="lastUpdate">—</span>
+  </footer>
+
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
+

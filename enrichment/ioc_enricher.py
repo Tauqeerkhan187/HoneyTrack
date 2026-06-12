@@ -24,7 +24,7 @@ class IOCEnricher:
     def enrich_ip(self, ip: str) -> dict[str, Any]:
         cache_key = f"ip:{ip}"
 
-        cache = self._get_cached(cached_key)
+        cached = self._get_cached(cache_key)
 
         if cached:
             return cached
