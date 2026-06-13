@@ -92,7 +92,7 @@ function renderTtpChart(pairs) {
       indexAxis: "y",
       plugins: { legend: { display: false } },
       scales: {
-        x: { ticks: { color: "#8595a8" }, grid: { color: "#1a2433" } },
+        x: { beginAtZero: true, ticks: { color: "#8595a8", stepSize: 1, precision: 0 }, grid: { color: "#1a2433" } },
         y: { ticks: { color: "#8595a8", font: { size: 10 } }, grid: { display: false } },
       },
     },
