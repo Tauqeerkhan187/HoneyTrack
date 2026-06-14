@@ -6,13 +6,17 @@ import asyncio
 
 from honeypot.ssh_honeypot import start_honeypot
 from dashboard.app import run_dashboard
+from honeypot.ssh_honeypot import start_honeypot
+from honeypot.telnet_honeypot import start_telnet_honeypot
+from dashboard.app import run_dashboard
 
 
 async def main():
     dashboard_task = asyncio.to_thread(run_dashboard)
     honeypot_task = start_honeypot()
+    telnet_task = start_telnet_honeypot()
 
-    await asyncio.gather(honeypot_task, dashboard_task)
+    await asyncio.gather(honeypot_task, telnet_task, dashboard_task)
 
 
 if __name__ == "__main__":

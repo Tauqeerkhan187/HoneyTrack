@@ -61,20 +61,21 @@ def log_auth_attempt(peer_addr, username: str, password: str, accepted: bool = T
 
 
 class SessionHandler:
-    def __init__(self, peer_addr):
+    def __init__(self, peer_addr, protocol="ssh"):
         peer_addr = peer_addr or ("unknown", 0)
 
         self.session_id = str(uuid.uuid4())[:8]
         self.peer_ip = peer_addr[0]
         self.peer_port = peer_addr[1]
         self.cwd = "/root"
+        self.protocol = protocol
         self.events = []
         self.closed = False
         self.start_time = datetime.now(timezone.utc)
         self.log_path = os.path.join(LOG_DIR, f"session_{self.session_id}.json")
 
         ensure_log_dir()
-        self._log_event("session_start", "", {"cwd": self.cwd})
+        self._log_event("session_start", "", {"cwd": self.cwd, "protocol": protocol})
 
 
     def handle_command(self, raw_input: str) -> str:
