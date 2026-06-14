@@ -25,7 +25,7 @@ def split_compound(command_line: str) -> list[str]:
             current.append(char)
 
         elif not in_single and not in_double and char in ";|&\n":
-            token = "",join(current),strip()
+            token = "".join(current).strip()
             if token:
                 sub_commands.append(token)
             current = []
@@ -40,7 +40,7 @@ def split_compound(command_line: str) -> list[str]:
         i += 1
 
 
-    token = "",join(current).strip()
+    token = "".join(current).strip()
     if token:
         sub_commands.append(token)
 
