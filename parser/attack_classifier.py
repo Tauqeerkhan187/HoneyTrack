@@ -6,54 +6,7 @@ import json
 import re
 
 from config import ATTACK_PATTERNS_FILE
-
-
-# Shell control operators that chain commands together.
-# We split on these so a compound one-liner is mapped to every technique it uses.
-def split_compound(command_line: str) -> list[str]:
-    """Split a shell command line into its individual sub-commands.
-
-    Splits on the shell control operators  ;  &&  ||  |  &  and newlines,
-    while respecting single and double quotes so that operators *inside*
-    a quoted string (e.g. echo "a && b") are NOT treated as separators.
-    Consecutive operators (&&, ||) collapse into a single split point.
-    """
-    sub_commands = []
-    current = []
-    in_single = False
-    in_double = False
-
-    i = 0
-    length = len(command_line)
-
-    while i < length:
-        char = command_line[i]
-
-        if char == "'" and not in_double:
-            in_single = not in_single
-            current.append(char)
-        elif char == '"' and not in_single:
-            in_double = not in_double
-            current.append(char)
-        elif not in_single and not in_double and char in ";|&\n":
-            token = "".join(current).strip()
-            if token:
-                sub_commands.append(token)
-            current = []
-            # Skip any run of operator chars so && / || collapse to one split
-            while i < length and command_line[i] in ";|&\n":
-                i += 1
-            continue
-        else:
-            current.append(char)
-
-        i += 1
-
-    token = "".join(current).strip()
-    if token:
-        sub_commands.append(token)
-
-    return sub_commands
+from shell_utils import split_compound
 
 
 class AttackClassifier:
