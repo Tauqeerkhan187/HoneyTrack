@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 from pathlib import PurePosixPath
 
 from config import LOG_DIR, FAKE_HOSTNAME, FAKE_USER
+from shell_utils import split_compound
 
 from honeypot.fake_fs import (
     FAKE_FILESYSTEM,
@@ -75,14 +76,38 @@ class SessionHandler:
         ensure_log_dir()
         self._log_event("session_start", "", {"cwd": self.cwd})
 
-    def handle_command(self, raw_input: str) -> str:
-        cmd = raw_input.strip()
 
-        if not cmd:
+    def handle_command(self, raw_input: str) -> str:
+        """Handle a full command line, splitting compound commands.
+
+        The full line is logged once as a 'command' event (so the dashboard
+        shows what the attacker actually typed). Each sub-command is then run
+        through the dispatcher so chained commands behave like a real shell
+        and every specialized event (downloads, file drops, etc.) still fires.
+        """
+        line = raw_input.strip()
+
+        if not line:
             return ""
 
-        self._log_event("command", cmd)
+        self._log_event("command", line)
 
+        sub_commands = split_compound(line)
+
+        outputs = []
+        for sub in sub_commands:
+            result = self._handle_single(sub)
+            if result == "__EXIT__":
+                return "__EXIT__"
+            if result:
+                outputs.append(result)
+
+        return "\n".join(outputs)
+
+
+
+    def _handle_single(self, raw_input: str) -> str:
+        """Handle ONE already split sub-command."""
         try:
             parts = shlex.split(cmd)
         except ValueError:
