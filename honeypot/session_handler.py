@@ -108,6 +108,11 @@ class SessionHandler:
 
     def _handle_single(self, raw_input: str) -> str:
         """Handle ONE already split sub-command."""
+        cmd = raw_input.strip()
+
+        if not cmd:
+            return ""
+
         try:
             parts = shlex.split(cmd)
         except ValueError:
