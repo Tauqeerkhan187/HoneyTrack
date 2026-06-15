@@ -35,10 +35,17 @@ def load_session(log_path: str) -> dict:
     persistence = [e for e in events if e.get("event") == "persistence_attempt"]
     files_dropped = [e for e in events if e.get("event") == "file_drop"]
 
+    protocol = "ssh"
+    for e in events:
+        if e.get("event") == "session_start":
+            protocol = e.get("protocol", "ssh")
+            break
+
     return {
         "session_id": events[0].get("session_id"),
         "peer_ip": events[0].get("peer_ip"),
         "peer_port": events[0].get("peer_port"),
+        "protocol": protocol,
         "start_time": events[0].get("timestamp"),
         "end_time": events[-1].get("timestamp"),
         "total_events": len(events),

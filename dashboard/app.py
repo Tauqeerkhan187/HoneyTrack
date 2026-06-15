@@ -25,6 +25,8 @@ def build_summary(enrich: bool = False) -> dict:
     tactic_counter = Counter()
     command_counter = Counter()
     ip_counter = Counter(s.get("peer_ip", "unknown") for s in sessions)
+    protocol_counter = Counter(s.get("protocol", "ssh") for s in sessions)
+
 
     for session in sessions:
         classification = classifier.classify_session(session)
@@ -54,6 +56,7 @@ def build_summary(enrich: bool = False) -> dict:
         "top_ttps": technique_counter.most_common(10),
         "top_tactics": tactic_counter.most_common(10),
         "top_commands": command_counter.most_common(10),
+        "protocol_counts": protocol_counter.most_common(),
         "enriched_ips": enriched_ips,
     }
 

@@ -4,6 +4,7 @@
 const REFRESH_MS = 15000;
 let tacticsChart = null;
 let ttpChart = null;
+let protocolChart = null;
 
 const COLORS = {
   accent: "#00e5a0",
@@ -53,6 +54,8 @@ function render(data) {
 
   renderTacticsChart(data.top_tactics || []);
   renderTtpChart(data.top_ttps || []);
+  renderProtocolChart(data.protocol_counts || []);
+  renderProtocolDetails(data.protocol_counts || []);
   renderAttackerTable(data);
   renderCommandTable(data.top_commands || []);
 }
@@ -97,6 +100,57 @@ function renderTtpChart(pairs) {
       },
     },
   });
+}
+
+function protocolColor(name) {
+  const map = { ssh: COLORS.accent, telnet: COLORS.info };
+  return map[String(name).toLowerCase()] || COLORS.warn;
+}
+
+function renderProtocolChart(pairs) {
+  const labels = pairs.map((p) => String(p[0]).toUpperCase());
+  const values = pairs.map((p) => p[1]);
+  const colors = pairs.map((p) => protocolColor(p[0]));
+  const ctx = document.getElementById("protocolChart");
+
+  if (protocolChart) protocolChart.destroy();
+  protocolChart = new Chart(ctx, {
+    type: "doughnut",
+    data: {
+      labels,
+      datasets: [{ data: values, backgroundColor: colors, borderColor: "#0a0e14", borderWidth: 2 }],
+    },
+    options: {
+      plugins: { legend: { position: "right", labels: { color: "#8595a8", font: { size: 12 } } } },
+      cutout: "62%",
+    },
+  });
+}
+
+function renderProtocolDetails(pairs) {
+  const el = document.getElementById("protocolDetails");
+  const total = pairs.reduce((sum, p) => sum + p[1], 0);
+
+  if (!total) {
+    el.innerHTML = '<div class="empty">No data yet.</div>';
+    return;
+  }
+
+  el.innerHTML = pairs
+    .map((p) => {
+      const name = String(p[0]).toUpperCase();
+      const count = p[1];
+      const pct = Math.round((count / total) * 100);
+      const color = protocolColor(p[0]);
+      return `<div class="proto-row">
+        <div class="proto-row-top">
+          <span class="proto-name">${name}</span>
+          <span class="proto-count">${count} session${count === 1 ? "" : "s"} \u00b7 ${pct}%</span>
+        </div>
+        <div class="proto-bar"><div class="proto-bar-fill" style="width:${pct}%;background:${color}"></div></div>
+      </div>`;
+    })
+    .join("");
 }
 
 function renderAttackerTable(data) {
