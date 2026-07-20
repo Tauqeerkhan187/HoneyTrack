@@ -132,7 +132,7 @@ def _complete_path(token: str, cwd: str, dirs_only: bool) -> tuple:
         fragment = token
 
     entries = _list_dir(base_dir)
-    matches = [e or e in entries if e.startswith(fragment)]
+    matches = [e for e in entries if e.startswith(fragment)]
 
     if dirs_only:
         matches = [e for e in matches if _is_dir(_join(base_dir, e))]
