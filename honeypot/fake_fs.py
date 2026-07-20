@@ -80,3 +80,116 @@ def fake_ifconfig():
         "        inet 192.168.1.105  netmask 255.255.255.0  broadcast 192.168.1.255\n"
         "        ether 08:00:27:ab:cd:ef  txqueuelen 1000  (Ethernet)\n"
     )
+
+KNOWN_COMMANDS = [
+    "ls", "cat", "cd", "pwd", "whoami", "id", "uname", "ifconfig", "ip",
+    "wget", "curl", "python", "python3", "perl", "bash", "sh", "chmod",
+    "chown", "chattr", "crontab", "touch", "echo", "clear", "reset", "exit",
+    "logout", "history",
+]
+
+
+_DIR_ONLY_COMMANDS = {"cd"}
+
+
+def _is_dir(path: str) -> bool:
+    """A path is a directory if it's a key in FAKE_FILESYSTEM."""
+    return path.rstrip("/") in FAKE_FILESYSTEM or path == "/"
+
+
+def _list_dir(path: str) -> list:
+    """Return entries in a fake directory, or [] if it isn't one."""
+    return FAKE_FILESYSTEM.get(path.rstrip("/") or "/", [])
+
+
+def _common_prefix(options: list) -> str:
+    """Longest common prefix across a list of strings (for partial completion.)"""
+    if not options:
+        return ""
+    prefix = option[0]
+    for opt in options[1:]:
+        while not opt.startswith(prefix):
+            prefix = prefix[:-1]
+            if not prefix:
+                return ""
+    return prefix
+
+
+def _complete_path(token: str, cwd: str, dirs_only: bool) -> tuple:
+    """Complete a filesystem token against the fake FS.
+
+    Returns (completion_suffix, matches) where completion_suffix is the text
+    to append to 'token', and matches is the list of candidates basenames
+    (used to print options on an ambiguous double-Tab)."""
+
+    # Split the token into the directory part and the fragment being typed.
+    if token.startswith("/"):
+        base_dir = token.rsplit("/", 1)[0] or "/"
+        fragment = token.rsplit("/", 1)[1]
+
+    elif "/" in token:
+        head = token.rsplit("/", 1)[0]
+        base_dir = _join(cwd, head)
+        fragment = token.rsplit("/", 1)[1]
+
+    else:
+        base_dir = cwd
+        fragment = token
+
+    entries = _list_dir(base_dir)
+    matches = [e for e in entries if e.startswith(fragment)]
+
+    if dirs_only:
+        matches = [e for e in matches if _is_dir(_join(base_dir, e))]
+
+    if not matches:
+        return "", []
+
+    if len(matches) == 1:
+        # Single match: complete it fully. Add '/' if it's a dir.
+        completed = matches[0]
+        full = _join(base_dir, completed)
+        suffix = completed[len(fragment):]
+        if _is_dir(full):
+            suffix += "/"
+        return suffix, matches
+
+    # Multiple matches: completes the common prefix only.
+    common = _common_prefix(matches)
+    return common[len(fragment):], matches
+
+
+def _join(base: str, name: str) -> str:
+    """Join a base dir and a name into a normalized absolute-ish path."""
+    if name.startswith("/"):
+        return name.rstrip("/") or "/"
+    base = base.rstrip("/")
+    return f"{base}/{name}" if base else f"/{name}"
+
+
+def complete(line: str, cwd: str) -> tuple:
+    """Bash-like completion for the current input line.
+
+    Returns (suffix, matches):
+    . Suffix: text to insert at the cursor (may be empty)
+    . matches: candidate list (for printing on ambiguous completion)
+    """
+    # Completing the command name (first word)
+    if " " not in line:
+        matches = [c for c in KNOWN_COMMANDS if c.startswith(line)]
+        if not matches:
+            return "", []
+        if len(matches) == 1:
+            return matches[0][len(line):] + " ", matches
+        return _common_prefix(matches)[len(line):], matches
+
+    # Completing an arg (a path).
+    parts = line.split(" ")
+    cmd = parts[0]
+    token = parts[-1]
+    dirs_only = cmd in _DIR_ONLY_COMMANDS
+    return _complete_path(token, cwd, dirs_only)
+
+
+
+

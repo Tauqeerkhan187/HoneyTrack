@@ -17,6 +17,7 @@ from config import (
 )
 
 from honeypot.session_handler import SessionHandler, log_auth_attempt
+from honeypot.fake_fs import complete
 
 
 HOST_KEY_PATH = os.path.join(os.path.dirname(__file__), "host_key")
@@ -77,7 +78,36 @@ class HoneypotSSHServerSession(asyncssh.SSHServerSession):
 
     def session_started(self):
         self._chan.write("Welcome to Ubuntu 22.04.3 LTS\r\n")
+        # register tab for bash-like completion (asyncssh handles history/editing already).
+        try:
+            self._chan.register_key("\t", self._handle_tab)
+        except Exception:
+            pass # if the client didn't allocate a PTY, editing isn't available
         self._send_prompt()
+
+    def _handle_tab(self, line, pos):
+        """asyncssh key handler: (line, pos) -> (new_line, new_pos).
+
+        Called when Tab is pressed. We complete against commands / fake FS
+        and return the rewritten line + cursor position for asyncssh to redraw.
+        """
+        suffix, matches = complete(line[:pos], self._handler.cwd)
+
+        if suffix:
+            new_line = line[:pos] + suffix + line[pos:]
+            new_pos = pos + len(suffix)
+            return new_line, new_pos
+
+        # Ambiguous with no shared prefix to add: print candidates, redraw prompt+line.
+        if len(matches) > 1:
+            listing = " ".join(matches)
+            prompt = f"{FAKE_USER}@{FAKE_HOSTNAME}:{self._handler.cwd}# "
+            self._chan.write("\r\n" + listing + "\r\n" + prompt + line)
+            return line, pos
+
+        # No  matches: do nothing (bash rings the bell here.)
+        return line, pos
+
 
     def data_received(self, data, datatype):
         if isinstance(data, bytes):
