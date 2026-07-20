@@ -118,26 +118,21 @@ def _common_prefix(options: list) -> str:
 def _complete_path(token: str, cwd: str, dirs_only: bool) -> tuple:
     """Complete a filesystem token against the fake FS.
 
-    Returns (completion_suffix, matches) where completion_suffix is the text
-    to append to 'token', and matches is the list of candidates basenames
-    (used to print options on an ambiguous double-Tab)."""
+    Returns (completion_suffix, matches)."""
 
-    # Split the token into the directory part and the fragment being typed.
-    if token.startswith("/"):
-        base_dir = token.rsplit("/", 1)[0] or "/"
-        fragment = token.rsplit("/", 1)[1]
-
-    elif "/" in token:
-        head = token.rsplit("/", 1)[0]
-        base_dir = _join(cwd, head)
-        fragment = token.rsplit("/", 1)[1]
-
+    # Determine the directory to look in and the fragment being typed.
+    if "/" in token:
+        head, fragment = token.rsplit("/", 1)
+        if token.startswith("/"):
+            base_dir = head if head else "/"
+        else:
+            base_dir = _join(cwd, head) if head else cwd
     else:
         base_dir = cwd
         fragment = token
 
     entries = _list_dir(base_dir)
-    matches = [e for e in entries if e.startswith(fragment)]
+    matches = [e or e in entries if e.startswith(fragment)]
 
     if dirs_only:
         matches = [e for e in matches if _is_dir(_join(base_dir, e))]
@@ -146,16 +141,13 @@ def _complete_path(token: str, cwd: str, dirs_only: bool) -> tuple:
         return "", []
 
     if len(matches) == 1:
-        # Single match: complete it fully. Add '/' if it's a dir.
         completed = matches[0]
-        full = _join(base_dir, completed)
         suffix = completed[len(fragment):]
-        if _is_dir(full):
+        if _is_dir(_join(base_dir, completed)):
             suffix += "/"
         return suffix, matches
 
-    # Multiple matches: completes the common prefix only.
-    common = _common_prefix(matches)
+    common = common_prefix(matches)
     return common[len(fragment):], matches
 
 
