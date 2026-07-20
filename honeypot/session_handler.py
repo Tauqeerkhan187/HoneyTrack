@@ -125,6 +125,42 @@ class SessionHandler:
         base = parts[0]
         args = parts[1:]
 
+        # sudo: on a root shell, sudo cmd just runs cmd. Strip the prefix,
+        # handle a few sudo-specific forms, then re-dispatch the remainder
+        if base == "sudo":
+            self._log_event("privilege_escalation", cmd, {"technique": "sudo"})
+
+            # sudo with no arguments -> usage text
+            if not args:
+                return ("usage: sudo [-h] [-K] [-k] [-V]\n"
+                        "usage: sudo -l [-U user] [command]\n"
+                        "usage: sudo [-u user] command")
+
+            if args[0] in ("-l", "--list"):
+                return ("Matching Default entries for root on ubuntu-server:\n"
+                        "   env_reset, mail_badpass,\n"
+                        "   secure_path=/usr/local/sbin\\:/usr/local/bin\\:/usr/sbin\\:/usr/bin\\:/sbin\\:/bin\n\n"
+                        "User root may run the following commands on ubuntu-server:\n"
+                        "   (ALL : ALL) ALL")
+
+            # sudo su / sudo - i / sudo -s / sudo su - -> already root, stay at shell
+
+            if args[0] in ("su", "-i", "-s") or (args[0] == "su" and "-" in args):
+                self._log_event("intrepreter_exec", cmd, {"shell": "root"})
+                return ""
+
+            # sudo -u <user> <cmd> -> skip the -u <user> part, run the rest
+            rest = args
+            if rest and rest[0] in ("-u", "--user") and len(rest) >= 2:
+                rest = rest[2:]
+
+            # Any other "sudo <command>": re-dispatch as if sudo weren't there.
+
+            if rest:
+                return self._handle_single(" ".join(rest))
+            return ""
+
+
         if base in ("ls", "dir"):
             path = self._resolve_path(args[0]) if args else self.cwd
             return fake_ls(path)
