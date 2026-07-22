@@ -95,13 +95,13 @@ def fake_uname():
 
 
 def fake_whoami(user="root"):
-    return "root"
+    return "user"
 
 
 def fake_id(user="root"):
     if user not in FAKE_USERS:
         return f"id: '{user}': no such user"
-    uid, gid, name = FAKE_USER[user]
+    uid, gid, name = FAKE_USERS[user]
     return f"uid={uid}({name}) gid={gid}({name}) groups={gid}({name})"
 
 def _uptime_parts():
@@ -237,7 +237,7 @@ def expand_vars(text, cwd="/root", user="root"):
     def repl(match):
         return env.get(match.group(1) or match.group(2), "")
 
-    return re.sub(r"\$\{\w+)\}|\$(\w+)", repl, text)
+    return re.sub(r"\$\{(\w+)\}|\$(\w+)", repl, text)
 
 
 def fake_ifconfig():
@@ -274,7 +274,7 @@ def _common_prefix(options: list) -> str:
     """Longest common prefix across a list of strings (for partial completion.)"""
     if not options:
         return ""
-    prefix = option[0]
+    prefix = options[0]
     for opt in options[1:]:
         while not opt.startswith(prefix):
             prefix = prefix[:-1]

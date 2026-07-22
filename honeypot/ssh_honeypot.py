@@ -121,7 +121,16 @@ class HoneypotSSHServerSession(asyncssh.SSHServerSession):
             line, self._input_buf = self._input_buf.split("\n", 1)
             line = line.replace("\r", "").strip()
 
-            response = self._handler.handle_command(line)
+            try:
+                response = self._handler.handle_command(line)
+            except Exception:
+                # A broken command must never drop the session -- that is both
+                # a fingerprint and a lost attacker. Log it for us, show the
+                # attacker something a real shell would plausibly print.
+                import traceback
+                traceback.print_exc()
+                base = line.split()[0] if line.split() else ""
+                response = f"{base}: command not found"
 
             if response == "__EXIT__":
                 self._chan.write("logout\r\n")
@@ -133,16 +142,6 @@ class HoneypotSSHServerSession(asyncssh.SSHServerSession):
                 self._chan.write(response + "\r\n")
 
             self._send_prompt()
-
-    def eof_received(self):
-        self._handler.close()
-        return False
-
-    def connection_lost(self, exc):
-        self._handler.close()
-
-    def _send_prompt(self):
-        self._chan.write(f"{FAKE_USER}@{FAKE_HOSTNAME}:{self._handler.cwd}# ")
 
 
 async def start_honeypot():
