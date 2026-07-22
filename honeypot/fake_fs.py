@@ -37,7 +37,7 @@ FAKE_FILE_CONTENTS = {
         "model name\t: Intel(R) Xeon(R) CPU E5-2670 0 @ 2.60GHz\n"
         "cpu cores\t: 1\n"
     ),
-    "/root/.bash_history": "",   # Empty — attacker thinks they're first
+    "/root/.bash_history": "",   # Empty - attacker thinks they're first
     "/etc/shadow": "Permission denied\n",
 }
 
@@ -63,8 +63,10 @@ FAKE_ENV = {
     "PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
     "MAIL": "/var/mail/root",
     "_": "/usr/bin/env",
-
 }
+
+
+# ---------------------------------------------------------------- filesystem
 
 
 def fake_ls(path="/"):
@@ -90,6 +92,9 @@ def fake_pwd(cwd="/root"):
     return cwd
 
 
+# ------------------------------------------------------------------ identity
+
+
 def fake_uname():
     return "Linux ubuntu-server 5.15.0-91-generic #101-Ubuntu SMP x86_64 GNU/Linux"
 
@@ -104,6 +109,18 @@ def fake_id(user="root"):
     uid, gid, name = FAKE_USERS[user]
     return f"uid={uid}({name}) gid={gid}({name}) groups={gid}({name})"
 
+
+def fake_ifconfig():
+    return (
+        "eth0: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500\n"
+        "        inet 192.168.1.105  netmask 255.255.255.0  broadcast 192.168.1.255\n"
+        "        ether 08:00:27:ab:cd:ef  txqueuelen 1000  (Ethernet)\n"
+    )
+
+
+# --------------------------------------------------------------------- recon
+
+
 def _uptime_parts():
     delta = datetime.now(timezone.utc) - FAKE_BOOT_TIME
     hours, remainder = divmod(delta.seconds, 3600)
@@ -113,7 +130,7 @@ def _uptime_parts():
 def fake_uptime():
     days, hours, minutes = _uptime_parts()
     now = datetime.now().strftime("%H:%M:%S")
-    return (f"{now} up {days} days, {hours}:{minutes:02d}, 1 user, "
+    return (f" {now} up {days} days, {hours}:{minutes:02d},  1 user,  "
             f"load average: 0.08, 0.03, 0.01")
 
 
@@ -121,7 +138,7 @@ def fake_ps(args=None):
     flat = " ".join(args or [])
 
     if "aux" in flat or "-ef" in flat or "-e" in flat:
-         return (
+        return (
             "USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND\n"
             "root           1  0.0  0.1 168404 11876 ?        Ss   Jun15   0:04 /sbin/init\n"
             "root           2  0.0  0.0      0     0 ?        S    Jun15   0:00 [kthreadd]\n"
@@ -143,6 +160,8 @@ def fake_ps(args=None):
 
 
 def fake_netstat(args=None):
+    # NOTE: never expose ports 2222/2323 or a python process here -- that
+    # would immediately give away the honeypot. PIDs match fake_ps output.
     return (
         "Active Internet connections (only servers)\n"
         "Proto Recv-Q Send-Q Local Address           Foreign Address         State       PID/Program name\n"
@@ -173,6 +192,7 @@ def fake_w(peer_ip="10.0.0.14"):
         f"root     pts/0    {peer_ip:<15}  {now[:5]}    0.00s  0.03s  0.00s -bash"
     )
 
+
 def fake_who(peer_ip="10.0.0.14"):
     stamp = datetime.now().strftime("%Y-%m-%d %H:%M")
     return f"root     pts/0        {stamp} ({peer_ip})"
@@ -187,6 +207,7 @@ def fake_last(peer_ip="10.0.0.14"):
         "reboot   system boot  5.15.0-91-generi Sun Jun 14 09:14   still running\n"
         "\nwtmp begins Sun Jun 14 09:14:22 2026"
     )
+
 
 def fake_free(args=None):
     if "-h" in " ".join(args or []):
@@ -217,12 +238,18 @@ def fake_df(args=None):
         "tmpfs             401420    1104    400316   1% /run"
     )
 
+
+# --------------------------------------------------------------- environment
+
+
 def _env_for(cwd="/root", user="root"):
     env = dict(FAKE_ENV)
+    home = "/root" if user == "root" else f"/home/{user}"
     env["PWD"] = cwd
     env["USER"] = user
     env["LOGNAME"] = user
-    env["HOME"] = "/root" if user == "root" else f"/home/{user}"
+    env["HOME"] = home
+    env["MAIL"] = f"/var/mail/{user}"
     return env
 
 
@@ -240,12 +267,8 @@ def expand_vars(text, cwd="/root", user="root"):
     return re.sub(r"\$\{(\w+)\}|\$(\w+)", repl, text)
 
 
-def fake_ifconfig():
-    return (
-        "eth0: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500\n"
-        "        inet 192.168.1.105  netmask 255.255.255.0  broadcast 192.168.1.255\n"
-        "        ether 08:00:27:ab:cd:ef  txqueuelen 1000  (Ethernet)\n"
-    )
+# --------------------------------------------------------------- completion
+
 
 KNOWN_COMMANDS = [
     "ls", "cat", "cd", "pwd", "whoami", "id", "uname", "ifconfig", "ip",
@@ -255,7 +278,6 @@ KNOWN_COMMANDS = [
     "ps", "netstat", "ss", "w", "who", "last", "uptime",
     "env", "printenv", "free", "df",
 ]
-
 
 _DIR_ONLY_COMMANDS = {"cd"}
 
@@ -271,7 +293,7 @@ def _list_dir(path: str) -> list:
 
 
 def _common_prefix(options: list) -> str:
-    """Longest common prefix across a list of strings (for partial completion.)"""
+    """Longest common prefix across a list of strings (for partial completion)."""
     if not options:
         return ""
     prefix = options[0]
@@ -283,12 +305,32 @@ def _common_prefix(options: list) -> str:
     return prefix
 
 
+def _join(base: str, name: str) -> str:
+    """Join a base dir and a name into a normalized absolute-ish path."""
+    if name.startswith("/"):
+        return name.rstrip("/") or "/"
+    base = base.rstrip("/")
+    return f"{base}/{name}" if base else f"/{name}"
+
+
+def _finish(matches: list, fragment: str, add_space: bool = False) -> tuple:
+    """Turn a list of candidates into a (suffix, matches) completion result."""
+    if not matches:
+        return "", []
+
+    if len(matches) == 1:
+        suffix = matches[0][len(fragment):]
+        return (suffix + " ") if add_space else suffix, matches
+
+    return _common_prefix(matches)[len(fragment):], matches
+
+
 def _complete_path(token: str, cwd: str, dirs_only: bool) -> tuple:
     """Complete a filesystem token against the fake FS.
 
-    Returns (completion_suffix, matches)."""
-
-    # Determine the directory to look in and the fragment being typed.
+    Returns (completion_suffix, matches).
+    """
+    # Split the token into the directory to search and the fragment typed.
     if "/" in token:
         head, fragment = token.rsplit("/", 1)
         if token.startswith("/"):
@@ -299,8 +341,7 @@ def _complete_path(token: str, cwd: str, dirs_only: bool) -> tuple:
         base_dir = cwd
         fragment = token
 
-    entries = _list_dir(base_dir)
-    matches = [e for e in entries if e.startswith(fragment)]
+    matches = [e for e in _list_dir(base_dir) if e.startswith(fragment)]
 
     if dirs_only:
         matches = [e for e in matches if _is_dir(_join(base_dir, e))]
@@ -315,54 +356,56 @@ def _complete_path(token: str, cwd: str, dirs_only: bool) -> tuple:
             suffix += "/"
         return suffix, matches
 
-    common = common_prefix(matches)
-    return common[len(fragment):], matches
-
-
-def _join(base: str, name: str) -> str:
-    """Join a base dir and a name into a normalized absolute-ish path."""
-    if name.startswith("/"):
-        return name.rstrip("/") or "/"
-    base = base.rstrip("/")
-    return f"{base}/{name}" if base else f"/{name}"
+    return _common_prefix(matches)[len(fragment):], matches
 
 
 def complete(line: str, cwd: str) -> tuple:
     """Bash-like completion for the current input line.
 
     Returns (suffix, matches):
-    . Suffix: text to insert at the cursor (may be empty)
-    . matches: candidate list (for printing on ambiguous completion)
+      - suffix: text to insert at the cursor (may be empty)
+      - matches: candidate list
+
+    Sees through a leading "sudo" (and "sudo -u <user>") so completion
+    behaves as if the wrapped command were typed directly. While the
+    username after -u is still being typed, usernames are completed
+    instead of commands.
     """
-    # See through a leading "sudo" (and "sudo -u user") so completion behaves
-    # as if the wrapped command were typed directly.
-    stripped = line
-    while True:
-        parts_check = stripped.split(" ", 1)
-        if parts_check[0] == "sudo" and len(parts_check) == 2:
-            remainder = parts_check[1]
-            # skip "-u user" if present
-            if remainder.startswith(("-u ", "--user ")):
-                bits = remainder.split(" ", 2)
-                remainder = bits[2] if len(bits) == 3 else ""
-            stripped = remainder
-        else:
-            break
+    tokens = line.split()
 
-    # Completing the command name (first word, no space yet).
-    if " " not in stripped:
-        matches = [c for c in KNOWN_COMMANDS if c.startswith(stripped)]
-        if not matches:
-            return "", []
-        if len(matches) == 1:
-            return matches[0][len(stripped):] + " ", matches
-        return _common_prefix(matches)[len(stripped):], matches
+    # A trailing space means a new, empty token is being started.
+    if line.endswith(" ") or not tokens:
+        tokens.append("")
 
-    # Completing an arg (a path)
-    parts = stripped.split(" ")
-    cmd = parts[0]
-    token = parts[-1]
-    dirs_only = cmd in _DIR_ONLY_COMMANDS
-    return _complete_path(token, cwd, dirs_only)
+    index = 0
+    while index < len(tokens) and tokens[index] == "sudo":
+        index += 1
 
+        if index < len(tokens) and tokens[index] in ("-u", "--user"):
+            # Still typing the username itself -> complete usernames.
+            if index + 1 == len(tokens) - 1:
+                return _finish(
+                    [u for u in FAKE_USERS if u.startswith(tokens[-1])],
+                    tokens[-1],
+                    add_space=True,
+                )
+
+            if index + 1 >= len(tokens):
+                break
+
+            index += 2
+
+    rest = tokens[index:] or [""]
+    fragment = rest[-1]
+
+    # First token -> command name completion.
+    if len(rest) == 1:
+        return _finish(
+            [c for c in KNOWN_COMMANDS if c.startswith(fragment)],
+            fragment,
+            add_space=True,
+        )
+
+    # Later tokens -> path completion.
+    return _complete_path(fragment, cwd, rest[0] in _DIR_ONLY_COMMANDS)
 
