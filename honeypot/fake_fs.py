@@ -166,22 +166,35 @@ def complete(line: str, cwd: str) -> tuple:
     . Suffix: text to insert at the cursor (may be empty)
     . matches: candidate list (for printing on ambiguous completion)
     """
-    # Completing the command name (first word)
-    if " " not in line:
-        matches = [c for c in KNOWN_COMMANDS if c.startswith(line)]
+    # See through a leading "sudo" (and "sudo -u user") so completion behaves
+    # as if the wrapped command were typed directly.
+    stripped = line
+    while True:
+        parts_check = stripped.split(" ", 1)
+        if parts_check[0] == "sudo" and len(parts_check) == 2:
+            remainder = parts_check[1]
+            # skip "-u user" if present
+            if remainder.startswith(("-u ", "--user ")):
+                bits = remainder.split(" ", 2)
+                remainder = bits[2] if len(bits) == 3 else ""
+            stripped = remainder
+        else:
+            break
+
+    # Completing the command name (first word, no space yet).
+    if " " not in stripped:
+        matches = [c for c in KNOWN_COMMANDS if c.startswith(stripped)]
         if not matches:
             return "", []
         if len(matches) == 1:
-            return matches[0][len(line):] + " ", matches
-        return _common_prefix(matches)[len(line):], matches
+            return matches[0][len(stripped):] + " ", matches
+        return _common_prefix(matches)[len(stripped):], matches
 
-    # Completing an arg (a path).
-    parts = line.split(" ")
+    # Completing an arg (a path)
+    parts = stripped.split(" ")
     cmd = parts[0]
     token = parts[-1]
     dirs_only = cmd in _DIR_ONLY_COMMANDS
     return _complete_path(token, cwd, dirs_only)
-
-
 
 
