@@ -95,7 +95,7 @@ def fake_uname():
 
 
 def fake_whoami(user="root"):
-    return "user"
+    return user
 
 
 def fake_id(user="root"):

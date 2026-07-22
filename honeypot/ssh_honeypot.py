@@ -95,15 +95,7 @@ class HoneypotSSHServerSession(asyncssh.SSHServerSession):
             suffix, matches = complete(line[:pos], self._handler.cwd)
 
             if suffix:
-                new_line = line[:pos] + suffix + line[pos:]
-                new_pos = pos + len(suffix)
-                return new_line, new_pos
-
-            if len(matches) > 1:
-                listing = " ".join(matches)
-                prompt = f"{FAKE_USER}@{FAKE_HOSTNAME}:{self._handler.cwd}# "
-                self._chan.write("\r\n" + listing + "\r\n" + prompt + line)
-                return line, pos
+                return line[:pos] + suffix + line[pos:], pos + len(suffix)
 
             return line, pos
 
@@ -142,6 +134,16 @@ class HoneypotSSHServerSession(asyncssh.SSHServerSession):
                 self._chan.write(response + "\r\n")
 
             self._send_prompt()
+
+    def eof_received(self):
+        self._handler.close()
+        return False
+
+    def connection_lost(self, exc):
+        self._handler.close()
+
+    def _send_prompt(self):
+        self._chan.write(f"{FAKE_USER}@{FAKE_HOSTNAME}:{self._handler.cwd}# ")
 
 
 async def start_honeypot():
