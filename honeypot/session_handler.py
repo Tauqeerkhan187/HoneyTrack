@@ -14,6 +14,7 @@ from shell_utils import split_compound
 
 from honeypot.fake_fs import (
     FAKE_FILESYSTEM,
+    FAKE_USERS,
     fake_ls,
     fake_cat,
     fake_pwd,
@@ -21,6 +22,17 @@ from honeypot.fake_fs import (
     fake_whoami,
     fake_id,
     fake_ifconfig,
+    fake_ps,
+    fake_netstat,
+    fake_ss,
+    fake_w,
+    fake_who,
+    fake_last,
+    fake_uptime,
+    fake_env,
+    fake_free,
+    fake_df,
+    expand_vars,
 )
 
 
@@ -77,7 +89,6 @@ class SessionHandler:
         ensure_log_dir()
         self._log_event("session_start", "", {"cwd": self.cwd, "protocol": protocol})
 
-
     def handle_command(self, raw_input: str) -> str:
         """Handle a full command line, splitting compound commands.
 
@@ -105,10 +116,14 @@ class SessionHandler:
 
         return "\n".join(outputs)
 
+    def _handle_single(self, raw_input: str, as_user: str = "root") -> str:
+        """Handle ONE already split sub-command, acting as `as_user`.
 
-
-    def _handle_single(self, raw_input: str) -> str:
-        """Handle ONE already split sub-command."""
+        `as_user` is normally "root". It changes only when a command is
+        re-dispatched through `sudo -u <user>`, so identity-aware commands
+        (whoami, id, echo $HOME) answer as that user. It is per-call, so the
+        identity never leaks into the next command -- same as real sudo.
+        """
         cmd = raw_input.strip()
 
         if not cmd:
@@ -125,8 +140,11 @@ class SessionHandler:
         base = parts[0]
         args = parts[1:]
 
-        # sudo: on a root shell, sudo cmd just runs cmd. Strip the prefix,
-        # handle a few sudo-specific forms, then re-dispatch the remainder
+        # --- sudo -------------------------------------------------------
+        # On a root shell, `sudo <cmd>` is just `<cmd>`. Strip the prefix and
+        # re-dispatch so every wrapped command keeps its normal behaviour and
+        # its ATT&CK logging, without special-casing each one.
+        # NOTE: this must stay first -- it re-enters this method.
         if base == "sudo":
             self._log_event("privilege_escalation", cmd, {"technique": "sudo"})
 
@@ -136,31 +154,37 @@ class SessionHandler:
                         "usage: sudo -l [-U user] [command]\n"
                         "usage: sudo [-u user] command")
 
+            # sudo -l -> list privileges (root may do everything)
             if args[0] in ("-l", "--list"):
-                return ("Matching Default entries for root on ubuntu-server:\n"
-                        "   env_reset, mail_badpass,\n"
-                        "   secure_path=/usr/local/sbin\\:/usr/local/bin\\:/usr/sbin\\:/usr/bin\\:/sbin\\:/bin\n\n"
+                return ("Matching Defaults entries for root on ubuntu-server:\n"
+                        "    env_reset, mail_badpass,\n"
+                        "    secure_path=/usr/local/sbin\\:/usr/local/bin\\:/usr/sbin\\:"
+                        "/usr/bin\\:/sbin\\:/bin\n\n"
                         "User root may run the following commands on ubuntu-server:\n"
-                        "   (ALL : ALL) ALL")
+                        "    (ALL : ALL) ALL")
 
-            # sudo su / sudo - i / sudo -s / sudo su - -> already root, stay at shell
-
-            if args[0] in ("su", "-i", "-s") or (args[0] == "su" and "-" in args):
-                self._log_event("intrepreter_exec", cmd, {"shell": "root"})
+            # sudo su / sudo -i / sudo -s -> already root, stay at the shell
+            if args[0] in ("su", "-i", "-s"):
+                self._log_event("interpreter_exec", cmd, {"shell": "root"})
                 return ""
 
-            # sudo -u <user> <cmd> -> skip the -u <user> part, run the rest
+            # sudo -u <user> <cmd> -> run the rest AS that user
+            target_user = "root"
             rest = args
-            if rest and rest[0] in ("-u", "--user") and len(rest) >= 2:
+
+            if rest[0] in ("-u", "--user") and len(rest) >= 2:
+                target_user = rest[1]
                 rest = rest[2:]
 
-            # Any other "sudo <command>": re-dispatch as if sudo weren't there.
+                if target_user not in FAKE_USERS:
+                    return f"sudo: unknown user {target_user}"
 
             if rest:
-                return self._handle_single(" ".join(rest))
+                return self._handle_single(" ".join(rest), as_user=target_user)
+
             return ""
 
-
+        # --- filesystem -------------------------------------------------
         if base in ("ls", "dir"):
             path = self._resolve_path(args[0]) if args else self.cwd
             return fake_ls(path)
@@ -183,11 +207,12 @@ class SessionHandler:
 
             return f"cd: {target}: No such file or directory"
 
+        # --- identity ---------------------------------------------------
         if base == "whoami":
-            return fake_whoami()
+            return fake_whoami(as_user)
 
         if base == "id":
-            return fake_id()
+            return fake_id(as_user)
 
         if base == "uname":
             return fake_uname()
@@ -195,6 +220,7 @@ class SessionHandler:
         if base in ("ifconfig", "ip"):
             return fake_ifconfig()
 
+        # --- ingress / execution / persistence --------------------------
         if base in ("wget", "curl"):
             url = self._extract_url(args)
 
@@ -236,6 +262,45 @@ class SessionHandler:
                 )
             return ""
 
+        # --- recon ------------------------------------------------------
+        if base == "ps":
+            return fake_ps(args)
+
+        if base == "netstat":
+            return fake_netstat(args)
+
+        if base == "ss":
+            return fake_ss(args)
+
+        if base == "w":
+            return fake_w(self.peer_ip)
+
+        if base == "who":
+            return fake_who(self.peer_ip)
+
+        if base == "last":
+            return fake_last(self.peer_ip)
+
+        if base == "uptime":
+            return fake_uptime()
+
+        if base in ("env", "printenv"):
+            return fake_env(self.cwd, as_user)
+
+        if base == "free":
+            return fake_free(args)
+
+        if base == "df":
+            return fake_df(args)
+
+        if base == "history":
+            commands = [e["value"] for e in self.events if e.get("event") == "command"]
+            return "\n".join(f"{i:5}  {c}" for i, c in enumerate(commands, 1))
+
+        # --- output redirection -----------------------------------------
+        # Must stay AHEAD of the plain `echo` branch so that
+        # `echo pwned > /root/.ssh/authorized_keys` is logged as a file drop
+        # rather than being swallowed as ordinary echo output.
         if ">" in cmd and "echo" in cmd:
             target = cmd.split(">", 1)[1].strip().split()[0]
 
@@ -247,6 +312,10 @@ class SessionHandler:
 
             return ""
 
+        if base == "echo":
+            return expand_vars(" ".join(args), self.cwd, as_user)
+
+        # --- session ----------------------------------------------------
         if base in ("exit", "logout", "quit"):
             return "__EXIT__"
 
