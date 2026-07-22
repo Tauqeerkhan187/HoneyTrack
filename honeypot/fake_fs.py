@@ -173,6 +173,10 @@ def fake_w(peer_ip="10.0.0.14"):
         f"root     pts/0    {peer_ip:<15}  {now[:5]}    0.00s  0.03s  0.00s -bash"
     )
 
+def fake_who(peer_ip="10.0.0.14"):
+    stamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+    return f"root     pts/0        {stamp} ({peer_ip})"
+
 
 def fake_last(peer_ip="10.0.0.14"):
     now = datetime.now().strftime("%a %b %d %H:%M")
