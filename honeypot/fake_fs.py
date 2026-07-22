@@ -6,13 +6,61 @@ import re
 from datetime import datetime, timedelta, timezone
 
 FAKE_FILESYSTEM = {
-    "/": ["bin", "boot", "dev", "etc", "home", "lib", "opt", "proc", "root", "srv", "tmp", "usr", "var"],
-    "/etc": ["passwd", "shadow", "hostname", "hosts", "crontab", "ssh", "os-release"],
-    "/root": [".bash_history", ".bashrc", ".ssh", "dead.letter"],
-    "/root/.ssh": ["authorized_keys"],
-    "/tmp": [],
+    "/": ["bin", "boot", "dev", "etc", "home", "lib", "opt", "proc", "root", "run", "sbin", "srv", "sys", "tmp", "usr", "var"],
+
+    "/bin": ["bash", "cat", "chmod", "chown", "cp", "date", "dd", "df", "echo", "grep",
+             "gzip", "hostname", "kill", "ln", "ls", "mkdir", "mv", "ping", "ps", "pwd",
+             "rm", "sed", "sh", "sleep", "tar", "touch", "uname", "wget"],
+    "/sbin": ["blkid", "fdisk", "fsck", "ifconfig", "init", "iptables", "mkfs", "reboot",
+              "route", "shutdown", "sysctl"],
+    "/boot": ["config-5.15.0-91-generic", "grub", "initrd.img-5.15.0-91-generic",
+              "System.map-5.15.0-91-generic", "vmlinuz-5.15.0-91-generic"],
+    "/dev": ["null", "zero", "random", "urandom", "sda", "sda1", "tty", "pts", "shm"],
+    "/lib": ["modules", "systemd", "terminfo", "udev", "x86_64-linux-gnu"],
+    "/opt": [],
+    "/srv": [],
+    "/sys": ["block", "class", "devices", "fs", "kernel", "module"],
+    "/run": ["lock", "log", "sshd.pid", "systemd", "user", "utmp"],
+
+    "/etc": ["apt", "cron.d", "cron.daily", "crontab", "default", "fstab", "group",
+             "hostname", "hosts", "init.d", "issue", "logrotate.d", "motd", "network",
+             "os-release", "passwd", "profile", "resolv.conf", "shadow", "ssh",
+             "sudoers", "sysctl.conf", "systemd"],
+    "/etc/ssh": ["moduli", "ssh_config", "ssh_config.d", "ssh_host_ecdsa_key",
+                 "ssh_host_ecdsa_key.pub", "ssh_host_ed25519_key",
+                 "ssh_host_ed25519_key.pub", "ssh_host_rsa_key",
+                 "ssh_host_rsa_key.pub", "sshd_config", "sshd_config.d"],
+    "/etc/cron.d": ["e2scrub_all"],
+    "/etc/cron.daily": ["apt-compat", "dpkg", "logrotate", "man-db"],
+
     "/home": ["ubuntu"],
-    "/proc": ["cpuinfo", "meminfo", "version"],
+    "/home/ubuntu": [".bash_history", ".bash_logout", ".bashrc", ".cache", ".profile", ".ssh"],
+    "/home/ubuntu/.ssh": ["authorized_keys", "known_hosts"],
+
+    "/root": [".bash_history", ".bashrc", ".cache", ".profile", ".ssh", "dead.letter"],
+    "/root/.ssh": ["authorized_keys", "known_hosts"],
+
+    "/tmp": [],
+
+    "/proc": ["1", "cpuinfo", "meminfo", "mounts", "net", "self", "stat", "uptime", "version"],
+
+    "/usr": ["bin", "games", "include", "lib", "local", "sbin", "share", "src"],
+    "/usr/bin": ["apt", "awk", "curl", "dpkg", "env", "free", "id", "last", "netstat",
+                 "perl", "python3", "screen", "ss", "ssh", "sudo", "systemctl", "top",
+                 "vim", "w", "wget", "whoami"],
+    "/usr/local": ["bin", "etc", "games", "include", "lib", "sbin", "share", "src"],
+    "/usr/local/bin": [],
+    "/usr/sbin": ["cron", "sshd", "useradd", "userdel", "usermod", "visudo"],
+
+    "/var": ["backups", "cache", "lib", "local", "lock", "log", "mail", "opt", "run",
+             "spool", "tmp"],
+    "/var/log": ["alternatives.log", "apt", "auth.log", "btmp", "dpkg.log", "journal",
+                 "kern.log", "lastlog", "syslog", "wtmp"],
+    "/var/spool": ["cron", "mail"],
+    "/var/spool/cron": ["crontabs"],
+    "/var/spool/cron/crontabs": [],
+    "/var/www": [],
+    "/var/tmp": [],
 }
 
 FAKE_FILE_CONTENTS = {
@@ -66,7 +114,7 @@ FAKE_ENV = {
 }
 
 
-# ---------------------------------------------------------------- filesystem
+# filesystem
 
 
 def fake_ls(path="/"):
@@ -92,7 +140,7 @@ def fake_pwd(cwd="/root"):
     return cwd
 
 
-# ------------------------------------------------------------------ identity
+#  identity
 
 
 def fake_uname():
@@ -118,7 +166,7 @@ def fake_ifconfig():
     )
 
 
-# --------------------------------------------------------------------- recon
+# recon
 
 
 def _uptime_parts():
@@ -160,7 +208,7 @@ def fake_ps(args=None):
 
 
 def fake_netstat(args=None):
-    # NOTE: never expose ports 2222/2323 or a python process here -- that
+    # NOTE: never expose ports 2222/2323 or a python process here - that
     # would immediately give away the honeypot. PIDs match fake_ps output.
     return (
         "Active Internet connections (only servers)\n"
@@ -239,7 +287,7 @@ def fake_df(args=None):
     )
 
 
-# --------------------------------------------------------------- environment
+# environment
 
 
 def _env_for(cwd="/root", user="root"):
@@ -267,7 +315,7 @@ def expand_vars(text, cwd="/root", user="root"):
     return re.sub(r"\$\{(\w+)\}|\$(\w+)", repl, text)
 
 
-# --------------------------------------------------------------- completion
+#  completion
 
 
 KNOWN_COMMANDS = [
