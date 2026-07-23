@@ -4,6 +4,10 @@
 
 import re
 from datetime import datetime, timedelta, timezone
+from config import (
+    FAKE_IFACE, FAKE_IP, FAKE_NETMASK, FAKE_BROADCAST,
+    FAKE_CIDR, FAKE_GATEWAY, FAKE_MAC, FAKE_MAC6,
+)
 
 FAKE_FILESYSTEM = {
     "/": ["bin", "boot", "dev", "etc", "home", "lib", "opt", "proc", "root", "run", "sbin", "srv", "sys", "tmp", "usr", "var"],
@@ -247,18 +251,20 @@ def fake_ls(path="/"):
     return "  ".join(contents)
 
 
-def fake_cat(path):
-    """Return fake file contents for a given path."""
+def fake_cat(path, ctx=None):
+    """Return fake file contents for a given path.
+
+    `ctx` carries session details (peer_ip, login_time) so generated
+    files can reflect the current attacker.
+    """
     if _is_dir(path):
         return f"cat: {path}: Is a directory"
 
     content = FAKE_FILE_CONTENTS.get(path, None)
 
     if content is not None:
-        return content() if callable(content) else content
+        return content(ctx or {}) if callable(content) else content
 
-    # Listed by ls but no canned content -> behave like empty file.
-    # Anything else is a contradiction an attacker might notice.
     if _file_exists(path):
         return ""
 
@@ -289,12 +295,66 @@ def fake_id(user="root"):
 
 def fake_ifconfig():
     return (
-        "eth0: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500\n"
-        "        inet 192.168.1.105  netmask 255.255.255.0  broadcast 192.168.1.255\n"
-        "        ether 08:00:27:ab:cd:ef  txqueuelen 1000  (Ethernet)\n"
+        f"{FAKE_IFACE}: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500\n"
+        f"        inet {FAKE_IP}  netmask {FAKE_NETMASK}  broadcast {FAKE_BROADCAST}\n"
+        f"        inet6 {FAKE_MAC6}  prefixlen 64  scopeid 0x20<link>\n"
+        f"        ether {FAKE_MAC}  txqueuelen 1000  (Ethernet)\n"
+        "        RX packets 184213  bytes 241893004 (241.8 MB)\n"
+        "        RX errors 0  dropped 0  overruns 0  frame 0\n"
+        "        TX packets 92847  bytes 12048221 (12.0 MB)\n"
+        "        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0\n"
+        "\n"
+        "lo: flags=73<UP,LOOPBACK,RUNNING>  mtu 65536\n"
+        "        inet 127.0.0.1  netmask 255.0.0.0\n"
+        "        inet6 ::1  prefixlen 128  scopeid 0x10<host>\n"
+        "        loop  txqueuelen 1000  (Local Loopback)\n"
+        "        RX packets 1842  bytes 158204 (158.2 KB)\n"
+        "        RX errors 0  dropped 0  overruns 0  frame 0\n"
+        "        TX packets 1842  bytes 158204 (158.2 KB)\n"
+        "        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0\n"
     )
 
 
+def fake_ip(args=None):
+    """iproute2 `ip` — output differs completely from ifconfig."""
+    sub = (args or [""])[0]
+
+    if sub.startswith("r"):          # ip r / ip route
+        return (
+            f"default via {FAKE_GATEWAY} dev {FAKE_IFACE} proto dhcp src {FAKE_IP} metric 100\n"
+            f"{FAKE_CIDR} dev {FAKE_IFACE} proto kernel scope link src {FAKE_IP} metric 100"
+        )
+
+    if sub.startswith("l"):          # ip l / ip link
+        return (
+            "1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN mode DEFAULT group default qlen 1000\n"
+            "    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00\n"
+            f"2: {FAKE_IFACE}: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP mode DEFAULT group default qlen 1000\n"
+            f"    link/ether {FAKE_MAC} brd ff:ff:ff:ff:ff:ff"
+        )
+
+    if sub.startswith("a"):          # ip a / ip addr
+        prefix = FAKE_CIDR.split("/")[1]
+        return (
+            "1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000\n"
+            "    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00\n"
+            "    inet 127.0.0.1/8 scope host lo\n"
+            "       valid_lft forever preferred_lft forever\n"
+            "    inet6 ::1/128 scope host\n"
+            "       valid_lft forever preferred_lft forever\n"
+            f"2: {FAKE_IFACE}: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP group default qlen 1000\n"
+            f"    link/ether {FAKE_MAC} brd ff:ff:ff:ff:ff:ff\n"
+            f"    inet {FAKE_IP}/{prefix} brd {FAKE_BROADCAST} scope global {FAKE_IFACE}\n"
+            "       valid_lft forever preferred_lft forever\n"
+            f"    inet6 {FAKE_MAC6}/64 scope link\n"
+            "       valid_lft forever preferred_lft forever"
+        )
+
+    return ("Usage: ip [ OPTIONS ] OBJECT { COMMAND | help }\n"
+            "       ip [ -force ] -batch filename\n"
+            "where  OBJECT := { address | addrlabel | link | route | rule | neigh | tunnel }\n"
+            "       OPTIONS := { -V[ersion] | -h[uman-readable] | -s[tatistics] |\n"
+            "                    -o[neline] | -4 | -6 | -br[ief] }")
 # recon
 
 
@@ -304,8 +364,14 @@ def _uptime_parts():
     return delta.days, hours, remainder // 60
 
 
-def fake_auth_log():
-    """Plausible auth.log, timestamped relative to the fake boot time."""
+def fake_auth_log(ctx=None):
+    """Plausible auth.log, timestamped relative to the fake boot time.
+
+    If session context is supplied, the attacker's own login is appended --
+    a real auth.log would show it, and its absence is a giveaway to anyone
+    checking whether they were noticed.
+    """
+    ctx = ctx or {}
     now = datetime.now()
     days, hours, minutes = _uptime_parts()
     boot = now - timedelta(days=days, hours=hours, minutes=minutes)
@@ -316,11 +382,9 @@ def fake_auth_log():
 
     lines = [
         f"{stamp(boot)} {host} sshd[731]: Server listening on 0.0.0.0 port 22.",
-
         f"{stamp(boot)} {host} sshd[731]: Server listening on :: port 22.",
     ]
 
-    # admin logins from a consistent trusted address.
     for offset in (9, 6, 3, 1):
         login = now - timedelta(days=offset, hours=2, minutes=17)
         pid = 2000 + offset * 37
@@ -333,7 +397,6 @@ def fake_auth_log():
             f"pam_unix(sshd:session): session closed for user root",
         ]
 
-    # routine cron sessions.
     for offset in (2, 1):
         cron = now - timedelta(hours=offset)
         lines += [
@@ -342,6 +405,24 @@ def fake_auth_log():
             f"{stamp(cron)} {host} CRON[{3100 + offset}]: pam_unix(cron:session): "
             f"session closed for user root",
         ]
+
+    # The current session.
+    peer_ip = ctx.get("peer_ip")
+    if peer_ip:
+        login_time = ctx.get("login_time") or now
+        if getattr(login_time, "tzinfo", None) is not None:
+            login_time = login_time.astimezone().replace(tzinfo=None)
+
+        peer_port = ctx.get("peer_port") or 48122
+        pid = 4021
+
+        lines += [
+            f"{stamp(login_time)} {host} sshd[{pid}]: Accepted password for root "
+            f"from {peer_ip} port {peer_port} ssh2",
+            f"{stamp(login_time)} {host} sshd[{pid}]: pam_unix(sshd:session): "
+            f"session opened for user root(uid=0) by (uid=0)",
+        ]
+
     return "\n".join(lines) + "\n"
 
 

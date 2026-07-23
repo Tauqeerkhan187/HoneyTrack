@@ -32,6 +32,7 @@ from honeypot.fake_fs import (
     fake_env,
     fake_free,
     fake_df,
+    fake_ip,
     expand_vars,
 )
 
@@ -194,7 +195,7 @@ class SessionHandler:
         if base == "cat":
             if not args:
                 return "cat: missing operand"
-            return fake_cat(self._resolve_path(args[0]))
+            return fake_cat(self._resolve_path(args[0]), self._ctx())
 
         if base == "pwd":
             return fake_pwd(self.cwd)
@@ -219,8 +220,11 @@ class SessionHandler:
         if base == "uname":
             return fake_uname()
 
-        if base in ("ifconfig", "ip"):
+        if base == "ifconfig":
             return fake_ifconfig()
+
+        if base == "ip":
+            return fake_ip(args)
 
         # --- ingress / execution / persistence --------------------------
         if base in ("wget", "curl"):
@@ -368,6 +372,14 @@ class SessionHandler:
 
         self.events.append(entry)
         write_jsonl(self.log_path, entry)
+
+    def _ctx(self) -> dict:
+        """Session context handed to generated fake files."""
+        return {
+            "peer_ip": self.peer_ip,
+            "peer_port": self.peer_port,
+            "login_time": self.start_time,
+        }
 
     def _resolve_path(self, path: str) -> str:
         if not path:

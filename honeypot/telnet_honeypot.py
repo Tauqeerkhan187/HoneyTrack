@@ -111,7 +111,8 @@ class TelnetSession:
                     break
 
                 if result:
-                    await self.send(result.replace("\n", "\r\n") + "\r\n")
+                    await self.send(result.rstrip("\n").replace("\n", "\r\n") +
+                                    "\r\n")
 
                 await self.send(self._prompt())
 

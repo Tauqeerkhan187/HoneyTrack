@@ -10,6 +10,14 @@ HONEYPOT_PORT = 2222      # Listen on 2222 (no root needed), forward from 22 lat
 HONEYPOT_BANNER = "SSH-2.0-OpenSSH_8.9p1 Ubuntu-3ubuntu0.6"
 FAKE_HOSTNAME = "ubuntu-server"
 FAKE_USER = "root"
+FAKE_IFACE = "eth0"
+FAKE_IP = "192.168.56.110"
+FAKE_NETMASK = "255.255.255.0"
+FAKE_BROADCAST = "192.168.56.255"
+FAKE_CIDR = "192.168.56.0/24"
+FAKE_GATEWAY = "192.168.56.1"
+FAKE_MAC = "08:00:27:ab:cd:ef"
+FAKE_MAC6 = "fe80::a00:27ff:feab:cdef"
 # Telnet Honeypot
 TELNET_HOST = "0.0.0.0"
 TELNET_PORT = 2323 # 2323 avoids needing root; forward 23 -> 2323 for real :23

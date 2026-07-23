@@ -131,7 +131,7 @@ class HoneypotSSHServerSession(asyncssh.SSHServerSession):
                 return
 
             if response:
-                self._chan.write(response + "\r\n")
+                self._chan.write(response.rstrip("\n") + "\r\n")
 
             self._send_prompt()
 
