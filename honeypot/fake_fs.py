@@ -69,6 +69,7 @@ FAKE_FILE_CONTENTS = {
         "daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin\n"
         "ubuntu:x:1000:1000:Ubuntu:/home/ubuntu:/bin/bash\n"
     ),
+
     "/etc/hostname": "ubuntu-server\n",
     "/etc/os-release": (
         'NAME="Ubuntu"\n'
@@ -76,17 +77,135 @@ FAKE_FILE_CONTENTS = {
         'ID=ubuntu\n'
         'VERSION_ID="22.04"\n'
     ),
+
     "/proc/version": (
         "Linux version 5.15.0-91-generic (buildd@lcy02-amd64-032) "
         "(gcc version 11.4.0) #101-Ubuntu SMP\n"
     ),
+
     "/proc/cpuinfo": (
         "processor\t: 0\nvendor_id\t: GenuineIntel\n"
         "model name\t: Intel(R) Xeon(R) CPU E5-2670 0 @ 2.60GHz\n"
         "cpu cores\t: 1\n"
     ),
+
     "/root/.bash_history": "",   # Empty - attacker thinks they're first
     "/etc/shadow": "Permission denied\n",
+
+    # --- network ---
+    "/etc/hosts": (
+        "127.0.0.1\tlocalhost\n"
+        "127.0.1.1\tubuntu-server\n\n"
+        "# The following lines are desirable for IPv6 capable hosts\n"
+        "::1     ip6-localhost ip6-loopback\n"
+        "fe00::0 ip6-localnet\n"
+        "ff00::0 ip6-mcastprefix\n"
+        "ff02::1 ip6-allnodes\n"
+        "ff02::2 ip6-allrouters\n"
+    ),
+
+    "/etc/resolv.conf": (
+        "# This is /run/systemd/resolve/stub-resolv.conf managed by man:systemd-resolved(8).\n"
+        "# Do not edit.\n\n"
+        "nameserver 127.0.0.53\n"
+        "options edns0 trust-ad\n"
+        "search .\n"
+    ),
+
+    # --- ssh (PermitRootLogin yes: they logged in as root, so it must be) ---
+    "/etc/ssh/sshd_config": (
+        "Include /etc/ssh/sshd_config.d/*.conf\n\n"
+        "Port 22\n"
+        "PermitRootLogin yes\n"
+        "PubkeyAuthentication yes\n"
+        "PasswordAuthentication yes\n"
+        "KbdInteractiveAuthentication no\n"
+        "UsePAM yes\n"
+        "X11Forwarding yes\n"
+        "PrintMotd no\n"
+        "AcceptEnv LANG LC_*\n"
+        "Subsystem\tsftp\t/usr/lib/openssh/sftp-server\n"
+    ),
+
+    "/root/.ssh/authorized_keys": "",
+    "/home/ubuntu/.ssh/authorized_keys": (
+        "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC7vbqajDhA8V9v8v0gV0Nk9c8xUu2P"
+        "Kf0mQhVYQXqZ8kLm3xRt5nJwHs2FdYpN6cGv1TzBxKr9WmQaLoPjEuXhS4A9dNfMbZ "
+        "ubuntu@ubuntu-server\n"
+    ),
+
+    "/etc/ssh/ssh_config": (
+        "Host *\n"
+        "    SendEnv LANG LC_*\n"
+        "    HashKnownHosts yes\n"
+        "    GSSAPIAuthentication yes\n"
+    ),
+
+
+    # --- system ---
+    "/etc/group": (
+        "root:x:0:\n"
+        "daemon:x:1:\n"
+        "sudo:x:27:ubuntu\n"
+        "ssh:x:114:\n"
+        "ubuntu:x:1000:\n"
+    ),
+
+    "/etc/fstab": (
+        "# /etc/fstab: static file system information.\n"
+        "UUID=8f4c1e2a-91b7-4f3d-a2c8-5e6d7f8a9b01 /  ext4  defaults  0 1\n"
+        "/swap.img\tnone\tswap\tsw\t0\t0\n"
+    ),
+
+    "/etc/issue": "Ubuntu 22.04.3 LTS \\n \\l\n\n",
+    "/etc/crontab": (
+        "SHELL=/bin/sh\n"
+        "PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin\n\n"
+        "17 *\t* * *\troot    cd / && run-parts --report /etc/cron.hourly\n"
+        "25 6\t* * *\troot\ttest -x /usr/sbin/anacron || "
+        "( cd / && run-parts --report /etc/cron.daily )\n"
+    ),
+
+    "/etc/sudoers": (
+        "Defaults\tenv_reset\n"
+        "Defaults\tmail_badpass\n"
+        "Defaults\tsecure_path=\"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\"\n\n"
+        "root\tALL=(ALL:ALL) ALL\n"
+        "%admin ALL=(ALL) ALL\n"
+        "%sudo\tALL=(ALL:ALL) ALL\n\n"
+        "@includedir /etc/sudoers.d\n"
+    ),
+
+    "/root/.profile": (
+        "# ~/.profile: executed by Bourne-compatible login shells.\n\n"
+        "if [ \"$BASH\" ]; then\n"
+        "  if [ -f ~/.bashrc ]; then\n"
+        "    . ~/.bashrc\n"
+        "  fi\n"
+        "fi\n\n"
+        "mesg n 2> /dev/null || true\n"
+    ),
+
+    "/root/.bashrc": (
+        "# ~/.bashrc: executed by bash(1) for non-login shells.\n\n"
+        "export PS1='\\h:\\w\\$ '\n"
+        "umask 022\n\n"
+        "# You may uncomment the following lines if you want `ls' to be colorized:\n"
+        "# export LS_OPTIONS='--color=auto'\n"
+        "# eval \"`dircolors`\"\n"
+        "# alias ls='ls $LS_OPTIONS'\n"
+    ),
+
+    # --- consistent with free -h ---
+    "/proc/meminfo": (
+        "MemTotal:        4014172 kB\n"
+        "MemFree:         3050112 kB\n"
+        "MemAvailable:    3358908 kB\n"
+        "Buffers:           68240 kB\n"
+        "Cached:           473984 kB\n"
+        "SwapTotal:       2097148 kB\n"
+        "SwapFree:        2097148 kB\n"
+    ),
 }
 
 # Fixed fake boot time so uptime stays consistent across commands
@@ -130,10 +249,20 @@ def fake_ls(path="/"):
 
 def fake_cat(path):
     """Return fake file contents for a given path."""
+    if _is_dir(path):
+        return f"cat: {path}: Is a directory"
+
     content = FAKE_FILE_CONTENTS.get(path, None)
-    if content is None:
-        return f"cat: {path}: No such file or directory"
-    return content
+
+    if content is not None:
+        return content() if callable(content) else content
+
+    # Listed by ls but no canned content -> behave like empty file.
+    # Anything else is a contradiction an attacker might notice.
+    if _file_exists(path):
+        return ""
+
+    return f"cat: {path}: No such file or directory"
 
 
 def fake_pwd(cwd="/root"):
@@ -175,6 +304,102 @@ def _uptime_parts():
     return delta.days, hours, remainder // 60
 
 
+def fake_auth_log():
+    """Plausible auth.log, timestamped relative to the fake boot time."""
+    now = datetime.now()
+    days, hours, minutes = _uptime_parts()
+    boot = now - timedelta(days=days, hours=hours, minutes=minutes)
+    host = "ubuntu-server"
+
+    def stamp(dt):
+        return f"{dt.strftime('%b')} {dt.day:2d} {dt.strftime('%H:%M:%S')}"
+
+    lines = [
+        f"{stamp(boot)} {host} sshd[731]: Server listening on 0.0.0.0 port 22.",
+
+        f"{stamp(boot)} {host} sshd[731]: Server listening on :: port 22.",
+    ]
+
+    # admin logins from a consistent trusted address.
+    for offset in (9, 6, 3, 1):
+        login = now - timedelta(days=offset, hours=2, minutes=17)
+        pid = 2000 + offset * 37
+        lines += [
+            f"{stamp(login)} {host} sshd[{pid}]: Accepted password for root "
+            f"from 10.0.0.14 port {41000 + offset} ssh2",
+            f"{stamp(login)} {host} sshd[{pid}]: pam_unix(sshd:session): "
+            f"session opened for user root(uid=0) by (uid=0)",
+            f"{stamp(login + timedelta(minutes=12))} {host} sshd[{pid}]: "
+            f"pam_unix(sshd:session): session closed for user root",
+        ]
+
+    # routine cron sessions.
+    for offset in (2, 1):
+        cron = now - timedelta(hours=offset)
+        lines += [
+            f"{stamp(cron)} {host} CRON[{3100 + offset}]: pam_unix(cron:session): "
+            f"session opened for user root(uid=0) by (uid=0)",
+            f"{stamp(cron)} {host} CRON[{3100 + offset}]: pam_unix(cron:session): "
+            f"session closed for user root",
+        ]
+    return "\n".join(lines) + "\n"
+
+
+def fake_proc_uptime():
+    days, hours, minutes = _uptime_parts()
+    total = days * 86400 + hours * 3600 + minutes * 60
+    return f"{total}.42 {int(total * 3.71)}.18\n"
+
+
+# Generated files: registered here because the functions must exist first.
+FAKE_FILE_CONTENTS["/var/log/auth.log"] = fake_auth_log
+FAKE_FILE_CONTENTS["/proc/uptime"] = fake_proc_uptime
+
+
+_VALID_FLAGS = {
+    "netstat" : set("aAcCdeFghiIlMnNoprsStuvVwWxZ46"),
+    "ss":       set("aAbdDeEfHilmnNoOpqrstuUvVwxz46"),
+    "free":     set("bkmghtwlscV"),
+    "df":       set("aBhHiklmPtTvxV"),
+}
+
+
+def _invalid_flag(args, command):
+     """Return the first unrecognised short flag, or None.
+
+     Real tools reject unknown options; accepting anything is fingerprinting.
+     """
+     valid = _VALID_FLAGS.get(command)
+     if not valid:
+         return None
+
+     for arg in args or []:
+         if arg.startswith("--") or not arg.startswith("-") or arg == "-":
+             continue
+         for char in arg[1:]:
+             if char not in valid:
+                 return char
+     return None
+
+
+def netstat_usage(bad_flag):
+    return (
+        f"netstat: invalid option -- '{bad_flag}'\n"
+        "usage: netstat [-vWeenNcCF] [<Af>] -r         netstat {-V|--version|-h|--help}\n"
+        "       netstat [-vWnNcaeol] [<Socket> ...]\n"
+        "       netstat { [-vWeenNac] -i | [-cnNe] -M | -s [-6tuw] }\n\n"
+        "        -r, --route              display routing table\n"
+        "        -i, --interfaces         display interface table\n"
+        "        -s, --statistics         display networking statistics (like SNMP)\n"
+        "        -v, --verbose            be verbose\n"
+        "        -n, --numeric            don't resolve names\n"
+        "        -p, --programs           display PID/Program name for sockets\n"
+        "        -l, --listening          display listening server sockets\n"
+        "        -a, --all                display all sockets (default: connected)\n\n"
+        "  <Socket>={-t|--tcp} {-u|--udp} {-U|--udplite} {-S|--sctp} {-w|--raw}\n"
+        "           {-x|--unix} --ax25 --ipx --netrom"
+    )
+
 def fake_uptime():
     days, hours, minutes = _uptime_parts()
     now = datetime.now().strftime("%H:%M:%S")
@@ -210,6 +435,10 @@ def fake_ps(args=None):
 def fake_netstat(args=None):
     # NOTE: never expose ports 2222/2323 or a python process here - that
     # would immediately give away the honeypot. PIDs match fake_ps output.
+    bad = _invalid_flag(args, "netstat")
+    if bad:
+        return netstat_usage(bad)
+
     return (
         "Active Internet connections (only servers)\n"
         "Proto Recv-Q Send-Q Local Address           Foreign Address         State       PID/Program name\n"
@@ -222,6 +451,20 @@ def fake_netstat(args=None):
 
 
 def fake_ss(args=None):
+    bad = _invalid_flag(args, "ss")
+    if bad:
+        return (f"ss: invalid option -- '{bad}'\n"
+                "Usage: ss [ OPTIONS ]\n"
+                "       ss [ OPTIONS ] [ FILTER ]\n"
+                "   -h, --help          this message\n"
+                "   -V, --version       output version information\n"
+                "   -n, --numeric       don't resolve service names\n"
+                "   -a, --all           display all sockets\n"
+                "   -l, --listening     display listening sockets\n"
+                "   -p, --processes     show process using socket\n"
+                "   -t, --tcp           display only TCP sockets\n"
+                "   -u, --udp           display only UDP sockets")
+
     return (
         "Netid  State   Recv-Q  Send-Q   Local Address:Port     Peer Address:Port  Process\n"
         "udp    UNCONN  0       0        127.0.0.53%lo:53             0.0.0.0:*      users:((\"systemd-resolve\",pid=618,fd=12))\n"
@@ -258,6 +501,20 @@ def fake_last(peer_ip="10.0.0.14"):
 
 
 def fake_free(args=None):
+    bad = _invalid_flag(args, "free")
+    if bad:
+        return (f"free: invalid option -- '{bad}'\n"
+                "Usage:\n free [options]\n\n"
+                "Options:\n"
+                " -b, --bytes         show output in bytes\n"
+                " -k, --kibi          show output in kibibytes\n"
+                " -m, --mebi          show output in mebibytes\n"
+                " -h, --human         show human-readable output\n"
+                " -t, --total         show total for RAM + swap\n\n"
+                "     --help     display this help and exit\n"
+                " -V, --version  output version information and exit\n\n"
+                "For more details see free(1).")
+
     if "-h" in " ".join(args or []):
         return (
             "               total        used        free      shared  buff/cache   available\n"
@@ -272,6 +529,11 @@ def fake_free(args=None):
 
 
 def fake_df(args=None):
+    bad = _invalid_flag(args, "df")
+    if bad:
+        return (f"df: invalid option -- '{bad}'\n"
+                "Try 'df --help' for more information.")
+
     if "-h" in " ".join(args or []):
         return (
             "Filesystem      Size  Used Avail Use% Mounted on\n"
@@ -333,6 +595,15 @@ _DIR_ONLY_COMMANDS = {"cd"}
 def _is_dir(path: str) -> bool:
     """A path is a directory if it's a key in FAKE_FILESYSTEM."""
     return path.rstrip("/") in FAKE_FILESYSTEM or path == "/"
+
+
+def _file_exists(path: str) -> bool:
+    """True if the path appears in its parent directory's listing."""
+    path = path.rstrip("/")
+    if "/" not in path:
+        return False
+    parent, name = path.rsplit("/", 1)
+    return name in _list_dir(parent or "/")
 
 
 def _list_dir(path: str) -> list:

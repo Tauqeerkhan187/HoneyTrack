@@ -182,7 +182,9 @@ class SessionHandler:
             if rest:
                 return self._handle_single(" ".join(rest), as_user=target_user)
 
-            return ""
+            return ("usage: sudo [-h] [-K] [-k] [-V]\n"
+                    "usage: sudo -l [-U user] [command]\n"
+                    "usage: sudo [-u user] command")
 
         # --- filesystem -------------------------------------------------
         if base in ("ls", "dir"):
@@ -241,7 +243,15 @@ class SessionHandler:
             host = url.split("/")[2] if "://" in url and len(url.split("/")) > 2 else url
             return f"{base}: unable to resolve host address '{host}'"
 
-        if base in ("python", "python3", "perl", "bash", "sh"):
+        if base == "python":
+            self._log_event("interpreter_exec", cmd)
+            return ("Command 'python' not found, did you mean:\n"
+                    "  command 'python3' from deb python3\n"
+                    "  command 'python' from deb python-is-python3\n"
+                    "Try: apt install <deb name>")
+
+
+        if base in ("python3", "perl", "bash", "sh"):
             self._log_event("interpreter_exec", cmd)
             return ""
 
