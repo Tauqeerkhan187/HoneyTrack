@@ -38,6 +38,7 @@ from honeypot.fake_fs import (
 
 
 AUTH_LOG = os.path.join(LOG_DIR, "auth_attempts.jsonl")
+EVENTS_LOG = os.path.join(LOG_DIR, "events.jsonl")
 
 
 def utc_now() -> str:
@@ -372,6 +373,7 @@ class SessionHandler:
 
         self.events.append(entry)
         write_jsonl(self.log_path, entry)
+        write_jsonl(EVENTS_LOG, entry)
 
     def _ctx(self) -> dict:
         """Session context handed to generated fake files."""
