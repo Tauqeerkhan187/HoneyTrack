@@ -183,6 +183,10 @@ Potential extensions, gated behind safe public deployment:
 
 ---
 
+## Related
+
+- [Detection Lab](https://github.com/Tauqeerkhan187/detection-lab) — the Wazuh SIEM rules that detect the attacks this honeypot captures.
+
 ## License
 
 MIT
